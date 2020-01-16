@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.jpark.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tlc200bot.model.MarketPost;
 import tlc200bot.model.User;
 
 import javax.sql.DataSource;
@@ -22,9 +23,9 @@ public class Database
 	public static void start()
 	{
 		_em.addEntityClass(User.class);
+		_em.addEntityClass(MarketPost.class);
 
 		_em.setConnectionFactory(Database::getConnection);
-		//**************************************************
 
 		HikariConfig config = new HikariConfig();
 
@@ -38,7 +39,7 @@ public class Database
 		config.addDataSourceProperty("databaseName", ServerConfig.DB_NAME);
 		config.addDataSourceProperty("loginTimeout", 2);
 
-		config.setLeakDetectionThreshold(5000);
+		config.setLeakDetectionThreshold(300000);
 		config.setConnectionTimeout(30000);
 
 		source = new HikariDataSource(config);
