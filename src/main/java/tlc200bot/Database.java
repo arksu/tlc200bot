@@ -1,14 +1,12 @@
 package tlc200bot;
 
-import com.origin.entity.User;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.jpark.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tlc200bot.model.User;
 
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -27,7 +25,6 @@ public class Database
 
 		_em.setConnectionFactory(Database::getConnection);
 		//**************************************************
-
 
 		HikariConfig config = new HikariConfig();
 

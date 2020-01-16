@@ -148,7 +148,7 @@ public class MyBot extends TelegramWebhookBot
 	@Override
 	public String getBotToken()
 	{
-		return "919280692:AAGKL3r4IkSdfAmZgjAI-vtSLyxA3zCMlgA";
+		return ServerConfig.TOKEN;
 	}
 
 	/**
@@ -158,6 +158,6 @@ public class MyBot extends TelegramWebhookBot
 	@Override
 	public String getBotPath()
 	{
-		return "t1";
+		return ServerConfig.PATH;
 	}
 }

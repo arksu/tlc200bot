@@ -17,6 +17,7 @@ public class Launcher
 	{
 		System.out.println("starting...");
 		ServerConfig.loadConfig();
+		Database.start();
 
 		ApiContextInitializer.init();
 		TelegramBotsApi botsApi;
