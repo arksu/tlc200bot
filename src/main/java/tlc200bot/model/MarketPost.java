@@ -17,6 +17,9 @@ public class MarketPost
 	@ColumnExtended(updateInsertId = true)
 	private int _id;
 
+	@Column(name = "userId", columnDefinition = "BIGINT NOT NULL")
+	private long _userId;
+
 	@Column(name = "title", columnDefinition = "VARCHAR(160) NULL")
 	private String _title;
 
@@ -46,6 +49,16 @@ public class MarketPost
 	public void setText(String text)
 	{
 		_text = text;
+	}
+
+	public long getUserId()
+	{
+		return _userId;
+	}
+
+	public void setUserId(long userId)
+	{
+		_userId = userId;
 	}
 
 	public void persist()

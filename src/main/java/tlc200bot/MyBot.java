@@ -42,36 +42,38 @@ public class MyBot extends TelegramWebhookBot
 		_log.debug("onWebhookUpdateReceived ");
 		_log.debug(update.toString());
 
-		if (update.hasMessage())
+		try
 		{
-			final Message msg = update.getMessage();
-			final Long chatId = msg.getChatId();
-			final String text = msg.getText();
-			if (msg.hasText())
+			if (update.hasMessage())
 			{
-				_log.debug("message: from=" + msg.getFrom().getId() + "[" + msg.getFrom().getFirstName() + "-" + msg.getFrom().getUserName() + "] -> [" + chatId + "] " + text);
+				final Message msg = update.getMessage();
+				final Long chatId = msg.getChatId();
+				final String text = msg.getText();
+				if (msg.hasText())
+				{
+					_log.debug("message: from=" + msg.getFrom().getId() + "[" + msg.getFrom().getFirstName() + "-" + msg.getFrom().getUserName() + "] -> [" + chatId + "] " + text);
 
-				if (chatId == TEST_CHAT_ID)
-				{
-				}
-				else
-				{
-					return processPersonalChat(update);
+					if (chatId == TEST_CHAT_ID)
+					{
+					}
+					else
+					{
+						return processPersonalChat(update);
+					}
 				}
 			}
-		}
-		else if (update.hasCallbackQuery())
-		{
-			final CallbackQuery callbackQuery = update.getCallbackQuery();
+			else if (update.hasCallbackQuery())
+			{
+				final CallbackQuery callbackQuery = update.getCallbackQuery();
 
-			_log.debug("callbackQuery");
+				_log.debug("callbackQuery");
 
-			return processCallbackQuery(callbackQuery);
-		}
-		else if (update.hasInlineQuery())
-		{
-			InlineQuery q = update.getInlineQuery();
-			_log.debug("InlineQuery " + q.getFrom().getId() + "[" + q.getFrom().getUserName() + "] " + q.getQuery());
+				return processCallbackQuery(callbackQuery);
+			}
+			else if (update.hasInlineQuery())
+			{
+				InlineQuery q = update.getInlineQuery();
+				_log.debug("InlineQuery " + q.getFrom().getId() + "[" + q.getFrom().getUserName() + "] " + q.getQuery());
 //			return new AnswerInlineQuery()
 //					.setPersonal(true)
 //					.setInlineQueryId(q.getId())
@@ -85,12 +87,16 @@ public class MyBot extends TelegramWebhookBot
 //									                                    .setMessageText("some text")
 //							            )
 //					);
+			}
+			else
+			{
+				_log.debug(update.toString());
+			}
 		}
-		else
+		catch (Throwable e)
 		{
-			_log.debug(update.toString());
+			_log.error("error", e);
 		}
-
 		return null;
 	}
 
@@ -220,6 +226,7 @@ public class MyBot extends TelegramWebhookBot
 				{
 					// объявления нет. создаем новое
 					MarketPost marketPost = new MarketPost();
+					marketPost.setUserId(user.getId());
 					marketPost.persist();
 
 					user.setActiveMarketPost(marketPost.getId());
@@ -311,7 +318,7 @@ public class MyBot extends TelegramWebhookBot
 							                .start()
 							                .addButton("Задать тему", BARAHOLKA_TITLE)
 							                .addButton("Задать текст", BARAHOLKA_TEXT)
-							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
+//							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
 							                .newRow()
 							                .addButton("Отменить создание поста", BARAHOLKA_CANCEL)
 							                .addButton("Опубликовать объявление", BARAHOLKA_POST)
@@ -327,7 +334,7 @@ public class MyBot extends TelegramWebhookBot
 							                .start()
 							                .addButton("Задать тему", BARAHOLKA_TITLE)
 							                .addButton("Задать текст", BARAHOLKA_TEXT)
-							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
+//							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
 							                .newRow()
 							                .addButton("Отменить создание поста", BARAHOLKA_CANCEL)
 							                .addButton("Опубликовать объявление", BARAHOLKA_POST)
@@ -348,7 +355,7 @@ public class MyBot extends TelegramWebhookBot
 					.setReplyMarkup(
 							KeyboardBuilder
 									.start()
-									.addButton("Пост в барахолку", BARAHOLKA_NEW)
+									.addButton("Объявление в барахолку", BARAHOLKA_NEW)
 									.newRow()
 									.addButton("Завершить работу", FINISH)
 									.build());
@@ -360,7 +367,7 @@ public class MyBot extends TelegramWebhookBot
 					.setReplyMarkup(
 							KeyboardBuilder
 									.start()
-									.addButton("Пост в барахолку", BARAHOLKA_NEW)
+									.addButton("Объявление в барахолку", BARAHOLKA_NEW)
 									.newRow()
 									.addButton("Завершить работу", FINISH)
 									.build());

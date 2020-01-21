@@ -15,8 +15,8 @@ import java.sql.Timestamp;
 public class User
 {
 	@Id
-	@Column(name = "id", columnDefinition = "BIGINT NOT NULL")
-	private int _id;
+	@Column(name = "id", columnDefinition = "long NOT NULL")
+	private long _id;
 
 	@Column(name = "userName", columnDefinition = "VARCHAR(32) NULL")
 	private String _userName;
@@ -27,7 +27,7 @@ public class User
 	@Column(name = "lastName", columnDefinition = "VARCHAR(32) NULL")
 	private String _lastName;
 
-	@Column(name = "activeMarketPost", columnDefinition = "INT(11) NULL")
+	@Column(name = "activeMarketPost", columnDefinition = "INT(11) DEFAULT 0")
 	private int _activeMarketPost;
 
 	@Column(name = "state", columnDefinition = "INT(11) NULL")
@@ -36,12 +36,12 @@ public class User
 	@Column(name = "createTime", columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
 	private Timestamp _createTime;
 
-	public int getId()
+	public long getId()
 	{
 		return _id;
 	}
 
-	public void setId(int id)
+	public void setId(long id)
 	{
 		_id = id;
 	}
