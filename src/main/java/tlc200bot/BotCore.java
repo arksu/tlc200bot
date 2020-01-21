@@ -4,10 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.TelegramWebhookBot;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.inlinequery.InlineQuery;
 import tlc200bot.model.MarketPost;
@@ -15,9 +17,9 @@ import tlc200bot.model.User;
 
 import static tlc200bot.model.UserState.*;
 
-public class MyBot extends TelegramWebhookBot
+public class BotCore extends TelegramWebhookBot
 {
-	private static final Logger _log = LoggerFactory.getLogger(MyBot.class.getName());
+	private static final Logger _log = LoggerFactory.getLogger(BotCore.class.getName());
 
 	private static final long TEST_CHAT_ID = -364010507L;
 
@@ -27,10 +29,24 @@ public class MyBot extends TelegramWebhookBot
 	private static final String BARAHOLKA_TITLE = BARAHOLKA + ":title";
 	private static final String BARAHOLKA_TEXT = BARAHOLKA + ":text";
 	private static final String BARAHOLKA_PHOTO = BARAHOLKA + ":photo";
+	private static final String BARAHOLKA_PHONE = BARAHOLKA + ":phone";
 	private static final String BARAHOLKA_CANCEL = BARAHOLKA + ":cancel";
+
+	/**
+	 * запрос на участие в группе
+	 */
+	private static final String REQUEST = "request";
+	private static final String REQUEST_NAME = REQUEST + ":name";
+
+	/**
+	 * заполнить анкету
+	 */
+	private static final String PROFILE = "profile";
+	private static final String PROFILE_NEW = PROFILE + ":new";
 
 	private static final String MAIN_MENU = "menu";
 	private static final String FINISH = "finish";
+	private static final String TEST = "test";
 
 	/**
 	 * This method is called when receiving updates via webhook
@@ -49,18 +65,18 @@ public class MyBot extends TelegramWebhookBot
 				final Message msg = update.getMessage();
 				final Long chatId = msg.getChatId();
 				final String text = msg.getText();
-				if (msg.hasText())
-				{
-					_log.debug("message: from=" + msg.getFrom().getId() + "[" + msg.getFrom().getFirstName() + "-" + msg.getFrom().getUserName() + "] -> [" + chatId + "] " + text);
+//				if (msg.hasText())
+//				{
+				_log.debug("message: from=" + msg.getFrom().getId() + "[" + msg.getFrom().getFirstName() + "-" + msg.getFrom().getUserName() + "] -> [" + chatId + "] " + text);
 
-					if (chatId == TEST_CHAT_ID)
-					{
-					}
-					else
-					{
-						return processPersonalChat(update);
-					}
+				if (chatId == TEST_CHAT_ID)
+				{
 				}
+				else
+				{
+					return processPersonalChat(update);
+				}
+//				}
 			}
 			else if (update.hasCallbackQuery())
 			{
@@ -112,8 +128,13 @@ public class MyBot extends TelegramWebhookBot
 		// если юзер найден в базе
 		if (user != null)
 		{
+			user.setFirstName(from.getFirstName());
+			user.setLastName(from.getLastName());
+			user.setUserName(from.getUserName());
+			user.persist();
+
 			final int activeMarketPostId = user.getActiveMarketPost();
-			if (user.getState() == WaitMarketPostTitle)
+			if (user.getState() == WaitMarketPostTitle && msg.hasText())
 			{
 				if (activeMarketPostId != 0)
 				{
@@ -138,7 +159,7 @@ public class MyBot extends TelegramWebhookBot
 					return Utils.error("no active market post", update);
 				}
 			}
-			else if (user.getState() == WaitMarketPostText)
+			else if (user.getState() == WaitMarketPostText && msg.hasText())
 			{
 				if (activeMarketPostId != 0)
 				{
@@ -164,6 +185,33 @@ public class MyBot extends TelegramWebhookBot
 					return Utils.error("no active market post", update);
 				}
 			}
+			else if (user.getState() == WaitMarketPostPhoto && msg.hasPhoto())
+			{
+				MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+				if (marketPost == null)
+				{
+					return Utils.error("no market post " + activeMarketPostId, update);
+				}
+
+				PhotoSize max = null;
+				int sz = 0;
+				for (PhotoSize size : msg.getPhoto())
+				{
+					if (size.getWidth() > sz)
+					{
+						max = size;
+						sz = size.getWidth();
+					}
+				}
+				if (max != null)
+				{
+					marketPost.setPhoto(msg.getMessageId());
+					marketPost.persist();
+				}
+
+				return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId)
+				);
+			}
 		}
 		else
 		{
@@ -173,6 +221,7 @@ public class MyBot extends TelegramWebhookBot
 			user.setFirstName(from.getFirstName());
 			user.setLastName(from.getLastName());
 			user.setUserName(from.getUserName());
+			user.setPersonalChatId(msg.getChatId());
 
 			Database.em().persist(user);
 		}
@@ -203,6 +252,16 @@ public class MyBot extends TelegramWebhookBot
 			if (FINISH.equals(data))
 			{
 				return Utils.deleteMessage(cb);
+			}
+			else if (TEST.equals(data))
+			{
+				ForwardMessage m = new ForwardMessage();
+				m.setChatId(TEST_CHAT_ID);
+				m.setFromChatId(316558811L);
+				m.setMessageId(605);
+
+				Utils.send(m);
+				return null;
 			}
 			else if (MAIN_MENU.equals(data))
 			{
@@ -241,7 +300,7 @@ public class MyBot extends TelegramWebhookBot
 				user.persist();
 
 				return new SendMessage().setChatId(chatId)
-				                        .setText("OK. Отправь мне ТЕМУ твоего объявления.");
+				                        .setText("OK. Отправь мне НАЗВАНИЕ твоего объявления.");
 
 			}
 			else if (BARAHOLKA_TEXT.equals(data))
@@ -251,6 +310,22 @@ public class MyBot extends TelegramWebhookBot
 
 				return new SendMessage().setChatId(chatId)
 				                        .setText("OK. Отправь мне ТЕКСТ твоего объявления.");
+			}
+			else if (BARAHOLKA_PHOTO.equals(data))
+			{
+				user.setState(WaitMarketPostPhoto);
+				user.persist();
+
+				return new SendMessage().setChatId(chatId)
+				                        .setText("OK. Отправь мне ФОТО для твоего объявления.");
+			}
+			else if (BARAHOLKA_PHONE.equals(data))
+			{
+				user.setState(WaitMarketPostPhone);
+				user.persist();
+
+				return new SendMessage().setChatId(chatId)
+				                        .setText("OK. Отправь мне ТЕЛЕФОН для твоего объявления.");
 			}
 			else if (BARAHOLKA_CANCEL.equals(data))
 			{
@@ -280,8 +355,31 @@ public class MyBot extends TelegramWebhookBot
 						// TODO публикуем!
 						_log.debug("POST!");
 
+						SendMessage m = new SendMessage();
+						m.setChatId(TEST_CHAT_ID);
+						m.setText(
+								"Новое объявление от " + user.getVisible() + "\r\n" +
+								marketPost.getTitle() + "\r\n" +
+								marketPost.getText()
+						);
+						Utils.send(m);
+
+						if (marketPost.getPhoto() > 0)
+						{
+							ForwardMessage f = new ForwardMessage();
+							f.setChatId(TEST_CHAT_ID);
+							f.setFromChatId(user.getPersonalChatId());
+							f.setMessageId(((int) marketPost.getPhoto()));
+
+							Utils.send(f);
+						}
+
 						user.setActiveMarketPost(0);
 						user.persist();
+
+						return new SendMessage()
+								.setChatId(chatId)
+								.setText("Ваше объявление опубликовано");
 					}
 					else
 					{
@@ -306,9 +404,8 @@ public class MyBot extends TelegramWebhookBot
 		}
 		else
 		{
-			text = "Объявление в барахолку\r\n" +
-			       "Тема: " + marketPost.getTitle() + "\r\n" +
-			       "Текст: " + marketPost.getText();
+			text = "Название объявления: " + marketPost.getTitle() + "\r\n" +
+			       "Текст объявления: " + marketPost.getText();
 		}
 		if (m instanceof SendMessage)
 		{
@@ -316,12 +413,14 @@ public class MyBot extends TelegramWebhookBot
 					.setText(text)
 					.setReplyMarkup(KeyboardBuilder
 							                .start()
-							                .addButton("Задать тему", BARAHOLKA_TITLE)
-							                .addButton("Задать текст", BARAHOLKA_TEXT)
-//							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
+							                .addButton("Название", BARAHOLKA_TITLE)
+							                .addButton("Текст", BARAHOLKA_TEXT)
 							                .newRow()
-							                .addButton("Отменить создание поста", BARAHOLKA_CANCEL)
-							                .addButton("Опубликовать объявление", BARAHOLKA_POST)
+							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
+							                .addButton("Указать телефон", BARAHOLKA_PHONE)
+							                .newRow()
+							                .addButton("Отменить", BARAHOLKA_CANCEL)
+							                .addButton("Опубликовать", BARAHOLKA_POST)
 							                .newRow()
 							                .addButton("< Обратно в меню", MAIN_MENU)
 							                .build());
@@ -332,12 +431,14 @@ public class MyBot extends TelegramWebhookBot
 					.setText(text)
 					.setReplyMarkup(KeyboardBuilder
 							                .start()
-							                .addButton("Задать тему", BARAHOLKA_TITLE)
-							                .addButton("Задать текст", BARAHOLKA_TEXT)
-//							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
+							                .addButton("Название", BARAHOLKA_TITLE)
+							                .addButton("Текст", BARAHOLKA_TEXT)
 							                .newRow()
-							                .addButton("Отменить создание поста", BARAHOLKA_CANCEL)
-							                .addButton("Опубликовать объявление", BARAHOLKA_POST)
+							                .addButton("Добавить фото", BARAHOLKA_PHOTO)
+							                .addButton("Указать телефон", BARAHOLKA_PHONE)
+							                .newRow()
+							                .addButton("Отменить", BARAHOLKA_CANCEL)
+							                .addButton("Опубликовать", BARAHOLKA_POST)
 							                .newRow()
 							                .addButton("< Обратно в меню", MAIN_MENU)
 							                .build());
@@ -355,9 +456,12 @@ public class MyBot extends TelegramWebhookBot
 					.setReplyMarkup(
 							KeyboardBuilder
 									.start()
+									.addButton("Заполнить анкету", PROFILE_NEW)
+									.newRow()
 									.addButton("Объявление в барахолку", BARAHOLKA_NEW)
 									.newRow()
 									.addButton("Завершить работу", FINISH)
+									.addButton("TEST", TEST)
 									.build());
 		}
 		else if (m instanceof EditMessageText)
@@ -367,9 +471,12 @@ public class MyBot extends TelegramWebhookBot
 					.setReplyMarkup(
 							KeyboardBuilder
 									.start()
+									.addButton("Заполнить анкету", PROFILE_NEW)
+									.newRow()
 									.addButton("Объявление в барахолку", BARAHOLKA_NEW)
 									.newRow()
 									.addButton("Завершить работу", FINISH)
+									.addButton("TEST", TEST)
 									.build());
 		}
 		return m;

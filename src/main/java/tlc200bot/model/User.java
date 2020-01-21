@@ -15,7 +15,7 @@ import java.sql.Timestamp;
 public class User
 {
 	@Id
-	@Column(name = "id", columnDefinition = "long NOT NULL")
+	@Column(name = "id", columnDefinition = "BIGINT NOT NULL")
 	private long _id;
 
 	@Column(name = "userName", columnDefinition = "VARCHAR(32) NULL")
@@ -32,6 +32,9 @@ public class User
 
 	@Column(name = "state", columnDefinition = "INT(11) NULL")
 	private int _state;
+
+	@Column(name = "personalChatId", columnDefinition = "BIGINT NULL")
+	private long _personalChatId;
 
 	@Column(name = "createTime", columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
 	private Timestamp _createTime;
@@ -76,6 +79,15 @@ public class User
 		_userName = userName;
 	}
 
+	public String getVisible()
+	{
+		if (_userName != null)
+		{
+			return "@" + _userName;
+		}
+		return _firstName;
+	}
+
 	public int getActiveMarketPost()
 	{
 		return _activeMarketPost;
@@ -99,6 +111,16 @@ public class User
 	public void setState(UserState state)
 	{
 		_state = state.id;
+	}
+
+	public long getPersonalChatId()
+	{
+		return _personalChatId;
+	}
+
+	public void setPersonalChatId(long personalChatId)
+	{
+		_personalChatId = personalChatId;
 	}
 
 	public Timestamp getCreateTime()

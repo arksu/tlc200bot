@@ -27,7 +27,7 @@ public class Launcher
 					ServerConfig.EXTERNAL_URL,
 					ServerConfig.INTERNAL_URL
 			);
-			botsApi.registerBot(new MyBot());
+			botsApi.registerBot(new BotCore());
 		}
 		catch (TelegramApiRequestException e)
 		{

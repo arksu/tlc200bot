@@ -26,6 +26,9 @@ public class MarketPost
 	@Column(name = "text", columnDefinition = "TEXT NULL")
 	private String _text;
 
+	@Column(name = "photo", columnDefinition = "BIGINT NULL")
+	private long _photo;
+
 	public int getId()
 	{
 		return _id;
@@ -54,6 +57,16 @@ public class MarketPost
 	public long getUserId()
 	{
 		return _userId;
+	}
+
+	public long getPhoto()
+	{
+		return _photo;
+	}
+
+	public void setPhoto(long photo)
+	{
+		_photo = photo;
 	}
 
 	public void setUserId(long userId)

@@ -8,7 +8,9 @@ public enum UserState
 
 	None(0),
 	WaitMarketPostTitle(1),
-	WaitMarketPostText(2);
+	WaitMarketPostText(2),
+	WaitMarketPostPhoto(3),
+	WaitMarketPostPhone(4);
 
 	public final int id;
 
