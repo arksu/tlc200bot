@@ -29,6 +29,9 @@ public class MarketPost
 	@Column(name = "photo", columnDefinition = "BIGINT NULL")
 	private long _photo;
 
+	@Column(name = "phone", columnDefinition = "VARCHAR(32) NULL")
+	private String _phone;
+
 	public int getId()
 	{
 		return _id;
@@ -67,6 +70,16 @@ public class MarketPost
 	public void setPhoto(long photo)
 	{
 		_photo = photo;
+	}
+
+	public String getPhone()
+	{
+		return _phone;
+	}
+
+	public void setPhone(String phone)
+	{
+		_phone = phone;
 	}
 
 	public void setUserId(long userId)

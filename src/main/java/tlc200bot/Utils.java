@@ -23,6 +23,11 @@ import java.nio.charset.StandardCharsets;
 
 public class Utils
 {
+	public static boolean isEmpty(String s)
+	{
+		return s == null || s.length() == 0;
+	}
+
 	public static EditMessageText editMessageText(CallbackQuery cb)
 	{
 		return new EditMessageText()

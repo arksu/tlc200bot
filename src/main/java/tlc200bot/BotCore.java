@@ -1,5 +1,7 @@
 package tlc200bot;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.TelegramWebhookBot;
@@ -12,6 +14,7 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.inlinequery.InlineQuery;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import tlc200bot.model.MarketPost;
 import tlc200bot.model.User;
 
@@ -48,6 +51,8 @@ public class BotCore extends TelegramWebhookBot
 	private static final String FINISH = "finish";
 	private static final String TEST = "test";
 
+	private static final ObjectMapper mapper = new ObjectMapper();
+
 	/**
 	 * This method is called when receiving updates via webhook
 	 * @param update Update received
@@ -56,7 +61,14 @@ public class BotCore extends TelegramWebhookBot
 	public BotApiMethod onWebhookUpdateReceived(Update update)
 	{
 		_log.debug("onWebhookUpdateReceived ");
-		_log.debug(update.toString());
+		try
+		{
+			_log.debug(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(update));
+		}
+		catch (JsonProcessingException e)
+		{
+			_log.error(e.getMessage(), e);
+		}
 
 		try
 		{
@@ -174,8 +186,7 @@ public class BotCore extends TelegramWebhookBot
 					user.setState(None);
 					user.persist();
 
-					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId)
-					);
+					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
 				}
 				else
 				{
@@ -185,32 +196,74 @@ public class BotCore extends TelegramWebhookBot
 					return Utils.error("no active market post", update);
 				}
 			}
-			else if (user.getState() == WaitMarketPostPhoto && msg.hasPhoto())
+			else if (user.getState() == WaitMarketPostPhoto)
 			{
 				MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
 				if (marketPost == null)
 				{
 					return Utils.error("no market post " + activeMarketPostId, update);
 				}
-
-				PhotoSize max = null;
-				int sz = 0;
-				for (PhotoSize size : msg.getPhoto())
+				if (msg.hasPhoto())
 				{
-					if (size.getWidth() > sz)
+
+					PhotoSize max = null;
+					int sz = 0;
+					for (PhotoSize size : msg.getPhoto())
 					{
-						max = size;
-						sz = size.getWidth();
+						if (size.getWidth() > sz)
+						{
+							max = size;
+							sz = size.getWidth();
+						}
+					}
+					if (max != null)
+					{
+						marketPost.setPhoto(msg.getMessageId());
+						marketPost.persist();
 					}
 				}
-				if (max != null)
-				{
-					marketPost.setPhoto(msg.getMessageId());
-					marketPost.persist();
-				}
+				user.setState(None);
+				user.persist();
 
-				return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId)
-				);
+				return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+			}
+			else if (user.getState() == WaitMarketPostPhone)
+			{
+				MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+				if (marketPost == null)
+				{
+					return Utils.error("no market post " + activeMarketPostId, update);
+				}
+				if (msg.hasContact())
+				{
+
+					String number = msg.getContact().getPhoneNumber();
+					if (!Utils.isEmpty(number))
+					{
+						if (number.startsWith("7"))
+						{
+							number = "+" + number;
+						}
+						marketPost.setPhone(number);
+						marketPost.persist();
+
+						Utils.send(new SendMessage()
+								           .setChatId(chatId)
+								           .setText("Телефон будет указан в объявлении")
+								           .setReplyMarkup(new ReplyKeyboardRemove()));
+					}
+				}
+				else
+				{
+					Utils.send(new SendMessage()
+							           .setChatId(chatId)
+							           .setText("Я не получил от тебя номер телефона")
+							           .setReplyMarkup(new ReplyKeyboardRemove()));
+				}
+				user.setState(None);
+				user.persist();
+
+				return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
 			}
 		}
 		else
@@ -325,7 +378,13 @@ public class BotCore extends TelegramWebhookBot
 				user.persist();
 
 				return new SendMessage().setChatId(chatId)
-				                        .setText("OK. Отправь мне ТЕЛЕФОН для твоего объявления.");
+				                        .setText("OK. Отправь мне ТЕЛЕФОН для твоего объявления.")
+				                        .setReplyMarkup(
+						                        KeyboardReplyBuilder.start()
+						                                            .addButtonPhone("Отправить номер")
+						                                            .build()
+
+				                        );
 			}
 			else if (BARAHOLKA_CANCEL.equals(data))
 			{
@@ -360,7 +419,8 @@ public class BotCore extends TelegramWebhookBot
 						m.setText(
 								"Новое объявление от " + user.getVisible() + "\r\n" +
 								marketPost.getTitle() + "\r\n" +
-								marketPost.getText()
+								marketPost.getText() +
+								(Utils.isEmpty(marketPost.getPhone()) ? "" : "\r\nТелефон: " + marketPost.getPhone())
 						);
 						Utils.send(m);
 
@@ -377,9 +437,11 @@ public class BotCore extends TelegramWebhookBot
 						user.setActiveMarketPost(0);
 						user.persist();
 
-						return new SendMessage()
-								.setChatId(chatId)
-								.setText("Ваше объявление опубликовано");
+						Utils.send(Utils.deleteMessage(cb));
+						Utils.send(new SendMessage()
+								           .setChatId(chatId)
+								           .setText("Ваше объявление опубликовано!"));
+						return makeMainMenu(new SendMessage().setChatId(chatId));
 					}
 					else
 					{
@@ -406,6 +468,10 @@ public class BotCore extends TelegramWebhookBot
 		{
 			text = "Название объявления: " + marketPost.getTitle() + "\r\n" +
 			       "Текст объявления: " + marketPost.getText();
+			if (!Utils.isEmpty(marketPost.getPhone()))
+			{
+				text += "\r\nТелефон: " + marketPost.getPhone();
+			}
 		}
 		if (m instanceof SendMessage)
 		{
