@@ -9,4 +9,5 @@ build
 .idea
 dist
 out
+logs
 config

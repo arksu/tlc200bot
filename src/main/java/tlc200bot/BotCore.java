@@ -1,19 +1,19 @@
 package tlc200bot;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.TelegramWebhookBot;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.PhotoSize;
-import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.inlinequery.InlineQuery;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import tlc200bot.model.MarketPost;
 import tlc200bot.model.User;
@@ -25,6 +25,7 @@ public class BotCore extends TelegramWebhookBot
 	private static final Logger _log = LoggerFactory.getLogger(BotCore.class.getName());
 
 	private static final long TEST_CHAT_ID = -364010507L;
+	private static final long MAIN_CHAT_ID = -364010507L;
 
 	private static final String BARAHOLKA = "baraholka";
 	private static final String BARAHOLKA_NEW = BARAHOLKA + ":new";
@@ -46,6 +47,7 @@ public class BotCore extends TelegramWebhookBot
 	 */
 	private static final String PROFILE = "profile";
 	private static final String PROFILE_NEW = PROFILE + ":new";
+	private static final String PROFILE_DATA = PROFILE + ":data";
 
 	private static final String MAIN_MENU = "menu";
 	private static final String FINISH = "finish";
@@ -135,7 +137,8 @@ public class BotCore extends TelegramWebhookBot
 		final String text = msg.getText();
 
 		final org.telegram.telegrambots.meta.api.objects.User from = msg.getFrom();
-		User user = Database.em().findById(User.class, from.getId());
+		final int fromId = from.getId();
+		User user = Database.em().findById(User.class, fromId);
 
 		// если юзер найден в базе
 		if (user != null)
@@ -146,140 +149,158 @@ public class BotCore extends TelegramWebhookBot
 			user.persist();
 
 			final int activeMarketPostId = user.getActiveMarketPost();
-			if (user.getState() == WaitMarketPostTitle && msg.hasText())
+			MarketPost marketPost = null;
+			if (activeMarketPostId != 0)
 			{
-				if (activeMarketPostId != 0)
-				{
-					MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+				marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+			}
+			switch (user.getState())
+			{
+				case WaitMarketPostTitle:
+					user.setState(None);
+					user.persist();
+
+					if (!msg.hasText())
+					{
+						Utils.send(Utils.error("Нет текста", update));
+					}
+					if (marketPost == null)
+					{
+						return Utils.error("no active market post", update);
+					}
+					else
+					{
+						marketPost.setTitle(text);
+						marketPost.persist();
+					}
+					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+				case WaitMarketPostText:
+					user.setState(None);
+					user.persist();
+
+					if (!msg.hasText())
+					{
+						Utils.send(Utils.error("Нет текста", update));
+					}
+					if (marketPost == null)
+					{
+						return Utils.error("no active market post", update);
+					}
+					else
+					{
+						marketPost.setText(text);
+						marketPost.persist();
+					}
+					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+				case WaitMarketPostPhoto:
+					user.setState(None);
+					user.persist();
+
 					if (marketPost == null)
 					{
 						return Utils.error("no market post " + activeMarketPostId, update);
 					}
-					marketPost.setTitle(text);
-					marketPost.persist();
-
-					user.setState(None);
-					user.persist();
-
+					if (msg.hasPhoto())
+					{
+						PhotoSize max = null;
+						int sz = 0;
+						for (PhotoSize size : msg.getPhoto())
+						{
+							if (size.getWidth() > sz)
+							{
+								max = size;
+								sz = size.getWidth();
+							}
+						}
+						if (max != null)
+						{
+							marketPost.setPhoto(msg.getMessageId());
+							marketPost.persist();
+						}
+					}
+					else
+					{
+						Utils.send(Utils.error("Нет фото", update));
+					}
 					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
-				}
-				else
-				{
+				case WaitMarketPostPhone:
 					user.setState(None);
 					user.persist();
 
-					return Utils.error("no active market post", update);
-				}
-			}
-			else if (user.getState() == WaitMarketPostText && msg.hasText())
-			{
-				if (activeMarketPostId != 0)
-				{
-					MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
 					if (marketPost == null)
 					{
 						return Utils.error("no market post " + activeMarketPostId, update);
 					}
-					marketPost.setText(text);
-					marketPost.persist();
+					if (msg.hasContact())
+					{
+						String number = msg.getContact().getPhoneNumber();
+						if (!Utils.isEmpty(number))
+						{
+							if (number.startsWith("7"))
+							{
+								number = "+" + number;
+							}
+							marketPost.setPhone(number);
+							marketPost.persist();
 
-					user.setState(None);
-					user.persist();
+							Utils.send(new SendMessage()
+									           .setChatId(chatId)
+									           .setText("Телефон будет указан в объявлении")
+									           .setReplyMarkup(new ReplyKeyboardRemove()));
+						}
+					}
+					else
+					{
+						Utils.send(Utils.error("Я не получил от тебя номер телефона", update));
+					}
 
 					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
-				}
-				else
-				{
-					user.setState(None);
-					user.persist();
-
-					return Utils.error("no active market post", update);
-				}
-			}
-			else if (user.getState() == WaitMarketPostPhoto)
-			{
-				MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
-				if (marketPost == null)
-				{
-					return Utils.error("no market post " + activeMarketPostId, update);
-				}
-				if (msg.hasPhoto())
-				{
-
-					PhotoSize max = null;
-					int sz = 0;
-					for (PhotoSize size : msg.getPhoto())
-					{
-						if (size.getWidth() > sz)
-						{
-							max = size;
-							sz = size.getWidth();
-						}
-					}
-					if (max != null)
-					{
-						marketPost.setPhoto(msg.getMessageId());
-						marketPost.persist();
-					}
-				}
-				user.setState(None);
-				user.persist();
-
-				return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
-			}
-			else if (user.getState() == WaitMarketPostPhone)
-			{
-				MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
-				if (marketPost == null)
-				{
-					return Utils.error("no market post " + activeMarketPostId, update);
-				}
-				if (msg.hasContact())
-				{
-
-					String number = msg.getContact().getPhoneNumber();
-					if (!Utils.isEmpty(number))
-					{
-						if (number.startsWith("7"))
-						{
-							number = "+" + number;
-						}
-						marketPost.setPhone(number);
-						marketPost.persist();
-
-						Utils.send(new SendMessage()
-								           .setChatId(chatId)
-								           .setText("Телефон будет указан в объявлении")
-								           .setReplyMarkup(new ReplyKeyboardRemove()));
-					}
-				}
-				else
-				{
-					Utils.send(new SendMessage()
-							           .setChatId(chatId)
-							           .setText("Я не получил от тебя номер телефона")
-							           .setReplyMarkup(new ReplyKeyboardRemove()));
-				}
-				user.setState(None);
-				user.persist();
-
-				return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+				default:
+					return makeMainMenu(user, new SendMessage().setChatId(chatId));
 			}
 		}
 		else
 		{
 			// юзера еще нет - создадим его
 			user = new User();
-			user.setId(from.getId());
+			user.setId(fromId);
 			user.setFirstName(from.getFirstName());
 			user.setLastName(from.getLastName());
 			user.setUserName(from.getUserName());
 			user.setPersonalChatId(msg.getChatId());
 
-			Database.em().persist(user);
-		}
+			// проверяем членство в группе
+			GetChatMember getChatMember = new GetChatMember()
+					.setChatId(MAIN_CHAT_ID)
+					.setUserId(fromId);
+			String r = Utils.send(getChatMember);
 
-		return makeMainMenu(new SendMessage().setChatId(chatId));
+			try
+			{
+				ApiResponse<ChatMember> result =
+						mapper.readValue(
+								r, new TypeReference<ApiResponse<ChatMember>>()
+								{
+								});
+
+				if (result != null)
+				{
+					final String status = result.getResult().getStatus();
+					if (Utils.isMember(status))
+					{
+						user.setMember(true);
+					}
+				}
+			}
+			catch (JsonProcessingException e)
+			{
+				_log.error(e.getMessage(), e);
+			}
+
+			user.persist();
+
+			return makeMainMenu(user, new SendMessage().setChatId(chatId));
+		}
 	}
 
 	private BotApiMethod processCallbackQuery(CallbackQuery cb)
@@ -318,140 +339,152 @@ public class BotCore extends TelegramWebhookBot
 			}
 			else if (MAIN_MENU.equals(data))
 			{
-				return makeMainMenu(Utils.editMessageText(cb));
+				return makeMainMenu(user, Utils.editMessageText(cb));
 			}
-			else if (BARAHOLKA_NEW.equals(data))
+			else if (user.isMember())
 			{
-				final int activeMarketPostId = user.getActiveMarketPost();
-				// есть активное не завершенное объявление?
-				if (activeMarketPostId != 0)
+				if (BARAHOLKA_NEW.equals(data))
 				{
-					MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
-					if (marketPost == null)
+					final int activeMarketPostId = user.getActiveMarketPost();
+
+					// есть активное не завершенное объявление?
+					if (activeMarketPostId != 0)
 					{
-						return Utils.error("no market post " + activeMarketPostId, cb);
-					}
-
-					return makeBaraholkaMenu(marketPost, Utils.editMessageText(cb));
-				}
-				else
-				{
-					// объявления нет. создаем новое
-					MarketPost marketPost = new MarketPost();
-					marketPost.setUserId(user.getId());
-					marketPost.persist();
-
-					user.setActiveMarketPost(marketPost.getId());
-					user.persist();
-
-					return makeBaraholkaMenu(null, Utils.editMessageText(cb));
-				}
-			}
-			else if (BARAHOLKA_TITLE.equals(data))
-			{
-				user.setState(WaitMarketPostTitle);
-				user.persist();
-
-				return new SendMessage().setChatId(chatId)
-				                        .setText("OK. Отправь мне НАЗВАНИЕ твоего объявления.");
-
-			}
-			else if (BARAHOLKA_TEXT.equals(data))
-			{
-				user.setState(WaitMarketPostText);
-				user.persist();
-
-				return new SendMessage().setChatId(chatId)
-				                        .setText("OK. Отправь мне ТЕКСТ твоего объявления.");
-			}
-			else if (BARAHOLKA_PHOTO.equals(data))
-			{
-				user.setState(WaitMarketPostPhoto);
-				user.persist();
-
-				return new SendMessage().setChatId(chatId)
-				                        .setText("OK. Отправь мне ФОТО для твоего объявления.");
-			}
-			else if (BARAHOLKA_PHONE.equals(data))
-			{
-				user.setState(WaitMarketPostPhone);
-				user.persist();
-
-				return new SendMessage().setChatId(chatId)
-				                        .setText("OK. Отправь мне ТЕЛЕФОН для твоего объявления.")
-				                        .setReplyMarkup(
-						                        KeyboardReplyBuilder.start()
-						                                            .addButtonPhone("Отправить номер")
-						                                            .build()
-
-				                        );
-			}
-			else if (BARAHOLKA_CANCEL.equals(data))
-			{
-				final int activeMarketPostId = user.getActiveMarketPost();
-				// есть активное не завершенное объявление?
-				if (activeMarketPostId != 0)
-				{
-					user.setActiveMarketPost(0);
-					user.persist();
-				}
-				return makeMainMenu(Utils.editMessageText(cb));
-			}
-			else if (BARAHOLKA_POST.equals(data))
-			{
-				final int activeMarketPostId = user.getActiveMarketPost();
-				// есть активное не завершенное объявление?
-				if (activeMarketPostId != 0)
-				{
-					MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
-					if (marketPost == null)
-					{
-						return Utils.error("no market post " + activeMarketPostId, cb);
-					}
-
-					if (marketPost.getTitle().length() > 0 && marketPost.getText().length() > 0)
-					{
-						// TODO публикуем!
-						_log.debug("POST!");
-
-						SendMessage m = new SendMessage();
-						m.setChatId(TEST_CHAT_ID);
-						m.setText(
-								"Новое объявление от " + user.getVisible() + "\r\n" +
-								marketPost.getTitle() + "\r\n" +
-								marketPost.getText() +
-								(Utils.isEmpty(marketPost.getPhone()) ? "" : "\r\nТелефон: " + marketPost.getPhone())
-						);
-						Utils.send(m);
-
-						if (marketPost.getPhoto() > 0)
+						MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+						if (marketPost == null)
 						{
-							ForwardMessage f = new ForwardMessage();
-							f.setChatId(TEST_CHAT_ID);
-							f.setFromChatId(user.getPersonalChatId());
-							f.setMessageId(((int) marketPost.getPhoto()));
-
-							Utils.send(f);
+							return Utils.error("no market post " + activeMarketPostId, cb);
 						}
 
-						user.setActiveMarketPost(0);
-						user.persist();
-
-						Utils.send(Utils.deleteMessage(cb));
-						Utils.send(new SendMessage()
-								           .setChatId(chatId)
-								           .setText("Ваше объявление опубликовано!"));
-						return makeMainMenu(new SendMessage().setChatId(chatId));
+						return makeBaraholkaMenu(marketPost, Utils.editMessageText(cb));
 					}
 					else
 					{
-						return null;
+						// объявления нет. создаем новое
+						MarketPost marketPost = new MarketPost();
+						marketPost.setUserId(user.getId());
+						marketPost.persist();
+
+						user.setActiveMarketPost(marketPost.getId());
+						user.persist();
+
+						return makeBaraholkaMenu(null, Utils.editMessageText(cb));
 					}
 				}
-				return makeMainMenu(Utils.editMessageText(cb));
+				else if (BARAHOLKA_TITLE.equals(data))
+				{
+					user.setState(WaitMarketPostTitle);
+					user.persist();
+
+					return new SendMessage().setChatId(chatId)
+					                        .setText("OK. Отправь мне НАЗВАНИЕ твоего объявления.");
+
+				}
+				else if (BARAHOLKA_TEXT.equals(data))
+				{
+					user.setState(WaitMarketPostText);
+					user.persist();
+
+					return new SendMessage().setChatId(chatId)
+					                        .setText("OK. Отправь мне ТЕКСТ твоего объявления.");
+				}
+				else if (BARAHOLKA_PHOTO.equals(data))
+				{
+					user.setState(WaitMarketPostPhoto);
+					user.persist();
+
+					return new SendMessage().setChatId(chatId)
+					                        .setText("OK. Отправь мне ФОТО для твоего объявления.");
+				}
+				else if (BARAHOLKA_PHONE.equals(data))
+				{
+					user.setState(WaitMarketPostPhone);
+					user.persist();
+
+					return new SendMessage().setChatId(chatId)
+					                        .setText("OK. Отправь мне ТЕЛЕФОН для твоего объявления.")
+					                        .setReplyMarkup(
+							                        KeyboardReplyBuilder.start()
+							                                            .addButtonPhone("Отправить номер")
+							                                            .build()
+
+					                        );
+				}
+				else if (BARAHOLKA_CANCEL.equals(data))
+				{
+					final int activeMarketPostId = user.getActiveMarketPost();
+					// есть активное не завершенное объявление?
+					if (activeMarketPostId != 0)
+					{
+						user.setActiveMarketPost(0);
+						user.persist();
+					}
+					return makeMainMenu(user, Utils.editMessageText(cb));
+				}
+				else if (BARAHOLKA_POST.equals(data))
+				{
+					final int activeMarketPostId = user.getActiveMarketPost();
+					// есть активное не завершенное объявление?
+					if (activeMarketPostId != 0)
+					{
+						MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+						if (marketPost == null)
+						{
+							return Utils.error("no market post " + activeMarketPostId, cb);
+						}
+
+						if (marketPost.getTitle().length() > 0 && marketPost.getText().length() > 0)
+						{
+							// TODO публикуем!
+							_log.debug("POST!");
+
+							SendMessage m = new SendMessage();
+							m.setChatId(TEST_CHAT_ID);
+							m.setText(
+									"Новое объявление от " + user.getVisible() + "\r\n" +
+									marketPost.getTitle() + "\r\n" +
+									marketPost.getText() +
+									(Utils.isEmpty(marketPost.getPhone()) ? "" : "\r\nТелефон: " + marketPost.getPhone())
+							);
+							Utils.send(m);
+
+							if (marketPost.getPhoto() > 0)
+							{
+								ForwardMessage f = new ForwardMessage();
+								f.setChatId(TEST_CHAT_ID);
+								f.setFromChatId(user.getPersonalChatId());
+								f.setMessageId(((int) marketPost.getPhoto()));
+
+								Utils.send(f);
+							}
+
+							user.setActiveMarketPost(0);
+							user.persist();
+
+							Utils.send(Utils.deleteMessage(cb));
+							Utils.send(new SendMessage()
+									           .setChatId(chatId)
+									           .setText("Ваше объявление опубликовано!"));
+							return makeMainMenu(user, new SendMessage().setChatId(chatId));
+						}
+						else
+						{
+							return null;
+						}
+					}
+					return makeMainMenu(user, Utils.editMessageText(cb));
+				}
+				else
+				{
+					return Utils.deleteMessage(cb);
+				}
 			}
 			else
 			{
+				if (PROFILE_NEW.equals(data))
+				{
+					// TODO
+				}
 				return Utils.deleteMessage(cb);
 			}
 		}
@@ -513,39 +546,47 @@ public class BotCore extends TelegramWebhookBot
 		return m;
 	}
 
-	private BotApiMethod makeMainMenu(BotApiMethod m)
+	private BotApiMethod makeMainMenu(User user, BotApiMethod m)
 	{
 		if (m instanceof SendMessage)
 		{
 			return ((SendMessage) m)
 					.setText("Меню")
-					.setReplyMarkup(
-							KeyboardBuilder
-									.start()
-									.addButton("Заполнить анкету", PROFILE_NEW)
-									.newRow()
-									.addButton("Объявление в барахолку", BARAHOLKA_NEW)
-									.newRow()
-									.addButton("Завершить работу", FINISH)
-									.addButton("TEST", TEST)
-									.build());
+					.setReplyMarkup(makeMainMenuImpl(user));
 		}
 		else if (m instanceof EditMessageText)
 		{
 			return ((EditMessageText) m)
 					.setText("Меню")
-					.setReplyMarkup(
-							KeyboardBuilder
-									.start()
-									.addButton("Заполнить анкету", PROFILE_NEW)
-									.newRow()
-									.addButton("Объявление в барахолку", BARAHOLKA_NEW)
-									.newRow()
-									.addButton("Завершить работу", FINISH)
-									.addButton("TEST", TEST)
-									.build());
+					.setReplyMarkup(makeMainMenuImpl(user));
+
 		}
 		return m;
+	}
+
+	private InlineKeyboardMarkup makeMainMenuImpl(User user)
+	{
+		if (user.isMember())
+		{
+			return
+					KeyboardBuilder
+							.start()
+							.addButton("Заполнить анкету", PROFILE_DATA)
+							.newRow()
+							.addButton("Объявление в барахолку", BARAHOLKA_NEW)
+							.newRow()
+							.addButton("Завершить работу", FINISH)
+//									.addButton("TEST", TEST)
+							.build();
+		}
+		else
+		{
+			return KeyboardBuilder
+					.start()
+					.addButton("Подать заявку на вступление", PROFILE_NEW)
+					.build();
+
+		}
 	}
 
 	/**

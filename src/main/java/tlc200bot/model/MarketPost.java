@@ -1,7 +1,7 @@
 package tlc200bot.model;
 
 import org.jpark.ColumnExtended;
-import tlc200bot.Database;
+import org.jpark.TableExtended;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -10,7 +10,8 @@ import javax.persistence.Table;
 
 @Entity
 @Table(name = "marketPosts")
-public class MarketPost
+@TableExtended(drop = true)
+public class MarketPost extends DbObject
 {
 	@Id
 	@Column(name = "id", columnDefinition = "INT(11) NOT NULL AUTO_INCREMENT")
@@ -85,10 +86,5 @@ public class MarketPost
 	public void setUserId(long userId)
 	{
 		_userId = userId;
-	}
-
-	public void persist()
-	{
-		Database.em().persist(this);
 	}
 }

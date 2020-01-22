@@ -1,7 +1,6 @@
 package tlc200bot.model;
 
 import org.jpark.TableExtended;
-import tlc200bot.Database;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -11,8 +10,8 @@ import java.sql.Timestamp;
 
 @Entity
 @Table(name = "users")
-@TableExtended(drop = false)
-public class User
+@TableExtended(drop = true)
+public class User extends DbObject
 {
 	@Id
 	@Column(name = "id", columnDefinition = "BIGINT NOT NULL")
@@ -33,11 +32,26 @@ public class User
 	@Column(name = "state", columnDefinition = "INT(11) NULL")
 	private int _state;
 
+	/**
+	 * ид чата лички с ботом
+	 */
 	@Column(name = "personalChatId", columnDefinition = "BIGINT NULL")
 	private long _personalChatId;
 
+	/**
+	 * когда юзер был добавлен в базу (первое общение с ботом)
+	 */
 	@Column(name = "createTime", columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
 	private Timestamp _createTime;
+
+	/**
+	 * время последней проверки членства в группе
+	 */
+	@Column(name = "lastMembershipCheck", columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
+	private Timestamp _lastMembershipCheck;
+
+	@Column(name = "isMember")
+	private boolean _isMember;
 
 	public long getId()
 	{
@@ -123,13 +137,28 @@ public class User
 		_personalChatId = personalChatId;
 	}
 
+	public Timestamp getLastMembershipCheck()
+	{
+		return _lastMembershipCheck;
+	}
+
+	public void setLastMembershipCheck(Timestamp lastMembershipCheck)
+	{
+		_lastMembershipCheck = lastMembershipCheck;
+	}
+
+	public boolean isMember()
+	{
+		return _isMember;
+	}
+
+	public void setMember(boolean member)
+	{
+		_isMember = member;
+	}
+
 	public Timestamp getCreateTime()
 	{
 		return _createTime;
-	}
-
-	public void persist()
-	{
-		Database.em().persist(this);
 	}
 }
