@@ -26,6 +26,7 @@ public class BotCore extends TelegramWebhookBot
 
 	private static final long TEST_CHAT_ID = -364010507L;
 	private static final long MAIN_CHAT_ID = -364010507L;
+	private static final long MARKET_CHANNEL_CHAT_ID = -1001244435287L;
 
 	private static final String BARAHOLKA = "baraholka";
 	private static final String BARAHOLKA_NEW = BARAHOLKA + ":new";
@@ -423,56 +424,7 @@ public class BotCore extends TelegramWebhookBot
 				}
 				else if (BARAHOLKA_POST.equals(data))
 				{
-					final int activeMarketPostId = user.getActiveMarketPost();
-					// есть активное не завершенное объявление?
-					if (activeMarketPostId != 0)
-					{
-						MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
-						if (marketPost == null)
-						{
-							return Utils.error("no market post " + activeMarketPostId, cb);
-						}
-
-						if (marketPost.getTitle().length() > 0 && marketPost.getText().length() > 0)
-						{
-							// TODO публикуем!
-							_log.debug("POST!");
-
-							SendMessage m = new SendMessage();
-							m.setChatId(TEST_CHAT_ID);
-							m.setText(
-									"Новое объявление от " + user.getVisible() + "\r\n" +
-									marketPost.getTitle() + "\r\n" +
-									marketPost.getText() +
-									(Utils.isEmpty(marketPost.getPhone()) ? "" : "\r\nТелефон: " + marketPost.getPhone())
-							);
-							Utils.send(m);
-
-							if (marketPost.getPhoto() > 0)
-							{
-								ForwardMessage f = new ForwardMessage();
-								f.setChatId(TEST_CHAT_ID);
-								f.setFromChatId(user.getPersonalChatId());
-								f.setMessageId(((int) marketPost.getPhoto()));
-
-								Utils.send(f);
-							}
-
-							user.setActiveMarketPost(0);
-							user.persist();
-
-							Utils.send(Utils.deleteMessage(cb));
-							Utils.send(new SendMessage()
-									           .setChatId(chatId)
-									           .setText("Ваше объявление опубликовано!"));
-							return makeMainMenu(user, new SendMessage().setChatId(chatId));
-						}
-						else
-						{
-							return null;
-						}
-					}
-					return makeMainMenu(user, Utils.editMessageText(cb));
+					return marketPost(user, chatId, cb);
 				}
 				else
 				{
@@ -488,6 +440,76 @@ public class BotCore extends TelegramWebhookBot
 				return Utils.deleteMessage(cb);
 			}
 		}
+	}
+
+	private BotApiMethod marketPost(User user, Long chatId, CallbackQuery cb)
+	{
+		final int activeMarketPostId = user.getActiveMarketPost();
+		// есть активное не завершенное объявление?
+		if (activeMarketPostId != 0)
+		{
+			MarketPost marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
+			if (marketPost == null)
+			{
+				return Utils.error("no market post " + activeMarketPostId, cb);
+			}
+
+			if (marketPost.getTitle().length() > 0 && marketPost.getText().length() > 0)
+			{
+				// TODO публикуем!
+				_log.debug("POST!");
+
+				final String text = "Новое объявление от " + user.getVisible() + "\r\n" +
+				                    marketPost.getTitle() + "\r\n" +
+				                    marketPost.getText() +
+				                    (Utils.isEmpty(marketPost.getPhone()) ? "" : "\r\nТелефон: " + marketPost.getPhone());
+
+				// отправлем в чат барахолки (рынка)
+				SendMessage m = new SendMessage();
+				m.setChatId(TEST_CHAT_ID);
+				m.setText(text);
+				Utils.send(m);
+
+				// также отправим в канал рынка
+				m = new SendMessage();
+				m.setChatId(MARKET_CHANNEL_CHAT_ID);
+				m.setText(text);
+				Utils.send(m);
+
+				// если есть фото пересылаем сообщение с фото
+				if (marketPost.getPhoto() > 0)
+				{
+					ForwardMessage f = new ForwardMessage();
+					f.setChatId(TEST_CHAT_ID);
+					f.setFromChatId(user.getPersonalChatId());
+					f.setMessageId(((int) marketPost.getPhoto()));
+
+					Utils.send(f);
+
+					f = new ForwardMessage();
+					f.setChatId(MARKET_CHANNEL_CHAT_ID);
+					f.setFromChatId(user.getPersonalChatId());
+					f.setMessageId(((int) marketPost.getPhoto()));
+
+					Utils.send(f);
+				}
+
+				// обновляем юзера
+				user.setActiveMarketPost(0);
+				user.persist();
+
+				Utils.send(Utils.deleteMessage(cb));
+				Utils.send(new SendMessage()
+						           .setChatId(chatId)
+						           .setText("Ваше объявление опубликовано!"));
+				return makeMainMenu(user, new SendMessage().setChatId(chatId));
+			}
+			else
+			{
+				return null;
+			}
+		}
+		return makeMainMenu(user, Utils.editMessageText(cb));
 	}
 
 	private BotApiMethod makeBaraholkaMenu(MarketPost marketPost, BotApiMethod m)

@@ -40,7 +40,7 @@ public class Database
 		config.addDataSourceProperty("loginTimeout", 2);
 
 		config.setLeakDetectionThreshold(300000);
-		config.setConnectionTimeout(30000);
+		config.setConnectionTimeout(60000);
 
 		source = new HikariDataSource(config);
 
