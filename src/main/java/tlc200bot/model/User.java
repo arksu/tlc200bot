@@ -50,6 +50,9 @@ public class User extends DbObject
 	@Column(name = "lastMembershipCheck", columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
 	private Timestamp _lastMembershipCheck;
 
+	/**
+	 * является участником группы / групп? действительный член сообщества?
+	 */
 	@Column(name = "isMember")
 	private boolean _isMember;
 
@@ -160,5 +163,11 @@ public class User extends DbObject
 	public Timestamp getCreateTime()
 	{
 		return _createTime;
+	}
+
+	@Override
+	public String toString()
+	{
+		return "(id=" + _id + " " + getVisible() + ")";
 	}
 }

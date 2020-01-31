@@ -149,6 +149,8 @@ public class BotCore extends TelegramWebhookBot
 			user.setUserName(from.getUserName());
 			user.persist();
 
+			checkMembership(user);
+
 			final int activeMarketPostId = user.getActiveMarketPost();
 			MarketPost marketPost = null;
 			if (activeMarketPostId != 0)
@@ -270,37 +272,40 @@ public class BotCore extends TelegramWebhookBot
 			user.setUserName(from.getUserName());
 			user.setPersonalChatId(msg.getChatId());
 
-			// проверяем членство в группе
-			GetChatMember getChatMember = new GetChatMember()
-					.setChatId(MAIN_CHAT_ID)
-					.setUserId(fromId);
-			String r = Utils.send(getChatMember);
+			checkMembership(user);
 
-			try
+			return makeMainMenu(user, new SendMessage().setChatId(chatId));
+		}
+	}
+
+	private void checkMembership(User user)
+	{
+		try
+		{
+			// проверяем членство в группе
+			String r = Utils.send(new GetChatMember()
+					                      .setChatId(MAIN_CHAT_ID)
+					                      .setUserId(((int) user.getId())));
+			if (r != null)
 			{
-				ApiResponse<ChatMember> result =
-						mapper.readValue(
-								r, new TypeReference<ApiResponse<ChatMember>>()
-								{
-								});
+				ApiResponse<ChatMember> result = mapper.readValue(r, new TypeReference<ApiResponse<ChatMember>>() {});
 
 				if (result != null)
 				{
 					final String status = result.getResult().getStatus();
-					if (Utils.isMember(status))
+					final boolean isMember = Utils.isMember(status);
+					if (user.isMember() != isMember)
 					{
-						user.setMember(true);
+						_log.warn("user change membership! " + user + " ismember=" + isMember);
 					}
+					user.setMember(isMember);
+					user.persist();
 				}
 			}
-			catch (JsonProcessingException e)
-			{
-				_log.error(e.getMessage(), e);
-			}
-
-			user.persist();
-
-			return makeMainMenu(user, new SendMessage().setChatId(chatId));
+		}
+		catch (JsonProcessingException e)
+		{
+			_log.error(e.getMessage(), e);
 		}
 	}
 
@@ -338,7 +343,10 @@ public class BotCore extends TelegramWebhookBot
 				Utils.send(m);
 				return null;
 			}
-			else if (MAIN_MENU.equals(data))
+
+			checkMembership(user);
+
+			if (MAIN_MENU.equals(data))
 			{
 				return makeMainMenu(user, Utils.editMessageText(cb));
 			}
