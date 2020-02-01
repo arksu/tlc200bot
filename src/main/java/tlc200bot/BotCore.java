@@ -16,6 +16,7 @@ import org.telegram.telegrambots.meta.api.objects.inlinequery.InlineQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import tlc200bot.model.MarketPost;
+import tlc200bot.model.RawLog;
 import tlc200bot.model.User;
 
 import static tlc200bot.model.UserState.*;
@@ -66,7 +67,11 @@ public class BotCore extends TelegramWebhookBot
 		_log.debug("onWebhookUpdateReceived ");
 		try
 		{
-			_log.debug(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(update));
+			final String msg = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(update);
+			_log.debug(msg);
+			RawLog log = new RawLog();
+			log.setText(msg);
+			log.persist();
 		}
 		catch (JsonProcessingException e)
 		{

@@ -10,7 +10,7 @@ import javax.persistence.Table;
 
 @Entity
 @Table(name = "marketPosts")
-@TableExtended(drop = true)
+@TableExtended(drop = false)
 public class MarketPost extends DbObject
 {
 	@Id

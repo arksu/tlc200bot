@@ -10,7 +10,7 @@ import java.sql.Timestamp;
 
 @Entity
 @Table(name = "users")
-@TableExtended(drop = true)
+@TableExtended(drop = false)
 public class User extends DbObject
 {
 	@Id
