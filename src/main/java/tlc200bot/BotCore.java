@@ -10,12 +10,14 @@ import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.inlinequery.InlineQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import tlc200bot.model.MarketPost;
+import tlc200bot.model.Profile;
 import tlc200bot.model.RawLog;
 import tlc200bot.model.User;
 
@@ -25,6 +27,7 @@ public class BotCore extends TelegramWebhookBot
 {
 	private static final Logger _log = LoggerFactory.getLogger(BotCore.class.getName());
 
+	private static final long[] ADMINS = new long[]{316558811L};
 	private static final long TEST_CHAT_ID = -364010507L;
 	private static final long MAIN_CHAT_ID = -364010507L;
 	private static final long MARKET_CHANNEL_CHAT_ID = -1001244435287L;
@@ -48,7 +51,7 @@ public class BotCore extends TelegramWebhookBot
 	 * заполнить анкету
 	 */
 	private static final String PROFILE = "profile";
-	private static final String PROFILE_NEW = PROFILE + ":new";
+	private static final String INVITE_REQUEST = "invite_request";
 	private static final String PROFILE_DATA = PROFILE + ":data";
 
 	private static final String MAIN_MENU = "menu";
@@ -162,6 +165,7 @@ public class BotCore extends TelegramWebhookBot
 			{
 				marketPost = Database.em().findById(MarketPost.class, activeMarketPostId);
 			}
+			Profile profile;
 			switch (user.getState())
 			{
 				case WaitMarketPostTitle:
@@ -182,6 +186,7 @@ public class BotCore extends TelegramWebhookBot
 						marketPost.persist();
 					}
 					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+
 				case WaitMarketPostText:
 					user.setState(None);
 					user.persist();
@@ -200,6 +205,7 @@ public class BotCore extends TelegramWebhookBot
 						marketPost.persist();
 					}
 					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+
 				case WaitMarketPostPhoto:
 					user.setState(None);
 					user.persist();
@@ -231,6 +237,7 @@ public class BotCore extends TelegramWebhookBot
 						Utils.send(Utils.error("Нет фото", update));
 					}
 					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+
 				case WaitMarketPostPhone:
 					user.setState(None);
 					user.persist();
@@ -263,6 +270,101 @@ public class BotCore extends TelegramWebhookBot
 					}
 
 					return makeBaraholkaMenu(marketPost, new SendMessage().setChatId(chatId));
+				case WaitInviteName:
+
+					profile = Database.em().findById(Profile.class, user.getId());
+					if (profile == null)
+					{
+						profile = new Profile();
+						profile.setId(user.getId());
+					}
+					if (!msg.hasText())
+					{
+						Utils.send(Utils.error("Нет текста", update));
+						user.setState(None);
+						user.persist();
+						return makeMainMenu(user, new SendMessage().setChatId(chatId));
+					}
+
+					user.setState(WaitInviteCity);
+					user.persist();
+
+					profile.setName(text);
+					profile.setNameMsgId(msg.getMessageId());
+					profile.persist();
+					return new SendMessage().setChatId(chatId)
+					                        .setText("Откуда ты? (город)");
+				case WaitInviteCity:
+					profile = Database.em().findById(Profile.class, user.getId());
+					if (profile == null)
+					{
+						profile = new Profile();
+						profile.setId(user.getId());
+					}
+					if (!msg.hasText())
+					{
+						Utils.send(Utils.error("Нет текста", update));
+						user.setState(None);
+						user.persist();
+						return makeMainMenu(user, new SendMessage().setChatId(chatId));
+					}
+					user.setState(WaitInviteYearAuto);
+					user.persist();
+
+					profile.setCity(text);
+					profile.setCityMsgId(msg.getMessageId());
+					profile.persist();
+					return new SendMessage().setChatId(chatId)
+					                        .setText("Год выпуска авто?");
+				case WaitInviteYearAuto:
+					profile = Database.em().findById(Profile.class, user.getId());
+					if (profile == null)
+					{
+						profile = new Profile();
+						profile.setId(user.getId());
+					}
+					if (!msg.hasText())
+					{
+						Utils.send(Utils.error("Нет текста", update));
+						user.setState(None);
+						user.persist();
+						return makeMainMenu(user, new SendMessage().setChatId(chatId));
+					}
+					user.setState(None);
+					user.persist();
+
+					profile.setYearAuto(text);
+					profile.setYearAutoMsgId(msg.getMessageId());
+					profile.persist();
+
+					for (long admin : ADMINS)
+					{
+						Utils.send(new SendMessage()
+								           .setChatId(admin)
+								           .setText("Новая заявка от " + profile.getName() + " из " + profile.getCity() + " авто год: " + profile.getYearAuto()));
+
+						ForwardMessage f = new ForwardMessage();
+						f.setChatId(admin);
+						f.setFromChatId(user.getPersonalChatId());
+						f.setMessageId(profile.getNameMsgId());
+						Utils.send(f);
+
+						f = new ForwardMessage();
+						f.setChatId(admin);
+						f.setFromChatId(user.getPersonalChatId());
+						f.setMessageId(profile.getCityMsgId());
+						Utils.send(f);
+
+						f = new ForwardMessage();
+						f.setChatId(admin);
+						f.setFromChatId(user.getPersonalChatId());
+						f.setMessageId(profile.getYearAutoMsgId());
+						Utils.send(f);
+					}
+
+					return new SendMessage().setChatId(chatId)
+					                        .setText("Ваша заявка принята. С Вами свяжутся");
+
 				default:
 					return makeMainMenu(user, new SendMessage().setChatId(chatId));
 			}
@@ -446,9 +548,15 @@ public class BotCore extends TelegramWebhookBot
 			}
 			else
 			{
-				if (PROFILE_NEW.equals(data))
+				if (INVITE_REQUEST.equals(data))
 				{
-					// TODO
+					user.setState(WaitInviteName);
+					user.persist();
+
+					Utils.send(new DeleteMessage().setChatId(chatId).setMessageId(cb.getMessage().getMessageId()));
+
+					return new SendMessage().setChatId(chatId)
+					                        .setText("Как тебя зовут?");
 				}
 				return Utils.deleteMessage(cb);
 			}
@@ -469,7 +577,6 @@ public class BotCore extends TelegramWebhookBot
 
 			if (marketPost.getTitle().length() > 0 && marketPost.getText().length() > 0)
 			{
-				// TODO публикуем!
 				_log.debug("POST!");
 
 				final String text = "Новое объявление от " + user.getVisible() + "\r\n" +
@@ -609,8 +716,8 @@ public class BotCore extends TelegramWebhookBot
 							.addButton("Заполнить анкету", PROFILE_DATA)
 							.newRow()
 							.addButton("Объявление в барахолку", BARAHOLKA_NEW)
-							.newRow()
-							.addButton("Завершить работу", FINISH)
+//							.newRow()
+//							.addButton("Завершить работу", FINISH)
 //									.addButton("TEST", TEST)
 							.build();
 		}
@@ -618,7 +725,7 @@ public class BotCore extends TelegramWebhookBot
 		{
 			return KeyboardBuilder
 					.start()
-					.addButton("Подать заявку на вступление", PROFILE_NEW)
+					.addButton("Подать заявку на вступление", INVITE_REQUEST)
 					.build();
 
 		}

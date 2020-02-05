@@ -6,6 +6,7 @@ import org.jpark.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tlc200bot.model.MarketPost;
+import tlc200bot.model.Profile;
 import tlc200bot.model.RawLog;
 import tlc200bot.model.User;
 
@@ -26,6 +27,7 @@ public class Database
 		_em.addEntityClass(User.class);
 		_em.addEntityClass(MarketPost.class);
 		_em.addEntityClass(RawLog.class);
+		_em.addEntityClass(Profile.class);
 
 		_em.setConnectionFactory(Database::getConnection);
 

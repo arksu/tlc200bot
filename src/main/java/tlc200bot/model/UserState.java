@@ -10,7 +10,14 @@ public enum UserState
 	WaitMarketPostTitle(1),
 	WaitMarketPostText(2),
 	WaitMarketPostPhoto(3),
-	WaitMarketPostPhone(4);
+	WaitMarketPostPhone(4),
+
+	// твое имя
+	WaitInviteName(5),
+	// откуда ты (город)
+	WaitInviteCity(6),
+	// год выпуска авто
+	WaitInviteYearAuto(7);
 
 	public final int id;
 
