@@ -17,7 +17,9 @@ public enum UserState
 	// откуда ты (город)
 	WaitInviteCity(6),
 	// год выпуска авто
-	WaitInviteYearAuto(7);
+	WaitInviteYearAuto(7),
+	// тип двигателя
+	WaitInviteEngineType(8);
 
 	public final int id;
 

@@ -31,6 +31,12 @@ public class Profile extends DbObject
 	@Column(name = "yearAutoMsgId", columnDefinition = "INT")
 	private int _yearAutoMsgId;
 
+	@Column(name = "engineType", columnDefinition = "VARCHAR(96) NULL")
+	private String _engineType;
+
+	@Column(name = "engineTypeMsgId", columnDefinition = "INT")
+	private int _engineTypeMsgId;
+
 	public long getId()
 	{
 		return _id;
@@ -99,5 +105,25 @@ public class Profile extends DbObject
 	public void setYearAutoMsgId(int yearAutoMsgId)
 	{
 		_yearAutoMsgId = yearAutoMsgId;
+	}
+
+	public String getEngineType()
+	{
+		return _engineType;
+	}
+
+	public void setEngineType(String engineType)
+	{
+		_engineType = engineType;
+	}
+
+	public int getEngineTypeMsgId()
+	{
+		return _engineTypeMsgId;
+	}
+
+	public void setEngineTypeMsgId(int engineTypeMsgId)
+	{
+		this._engineTypeMsgId = engineTypeMsgId;
 	}
 }

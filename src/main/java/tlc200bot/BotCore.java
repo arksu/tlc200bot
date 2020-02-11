@@ -27,7 +27,7 @@ public class BotCore extends TelegramWebhookBot
 {
 	private static final Logger _log = LoggerFactory.getLogger(BotCore.class.getName());
 
-	private static final long[] ADMINS = new long[]{316558811L};
+	private static final long[] ADMINS = new long[]{316558811L, 192005802L};
 	private static final long TEST_CHAT_ID = -364010507L;
 	private static final long MAIN_CHAT_ID = -364010507L;
 	private static final long MARKET_CHANNEL_CHAT_ID = -1001244435287L;
@@ -292,6 +292,7 @@ public class BotCore extends TelegramWebhookBot
 					profile.setName(text);
 					profile.setNameMsgId(msg.getMessageId());
 					profile.persist();
+
 					return new SendMessage().setChatId(chatId)
 					                        .setText("Откуда ты? (город)");
 				case WaitInviteCity:
@@ -314,6 +315,7 @@ public class BotCore extends TelegramWebhookBot
 					profile.setCity(text);
 					profile.setCityMsgId(msg.getMessageId());
 					profile.persist();
+
 					return new SendMessage().setChatId(chatId)
 					                        .setText("Год выпуска авто?");
 				case WaitInviteYearAuto:
@@ -330,40 +332,38 @@ public class BotCore extends TelegramWebhookBot
 						user.persist();
 						return makeMainMenu(user, new SendMessage().setChatId(chatId));
 					}
-					user.setState(None);
+					user.setState(WaitInviteEngineType);
 					user.persist();
 
 					profile.setYearAuto(text);
 					profile.setYearAutoMsgId(msg.getMessageId());
 					profile.persist();
 
-					for (long admin : ADMINS)
-					{
-						Utils.send(new SendMessage()
-								           .setChatId(admin)
-								           .setText("Новая заявка от " + profile.getName() + " из " + profile.getCity() + " авто год: " + profile.getYearAuto()));
-
-						ForwardMessage f = new ForwardMessage();
-						f.setChatId(admin);
-						f.setFromChatId(user.getPersonalChatId());
-						f.setMessageId(profile.getNameMsgId());
-						Utils.send(f);
-
-						f = new ForwardMessage();
-						f.setChatId(admin);
-						f.setFromChatId(user.getPersonalChatId());
-						f.setMessageId(profile.getCityMsgId());
-						Utils.send(f);
-
-						f = new ForwardMessage();
-						f.setChatId(admin);
-						f.setFromChatId(user.getPersonalChatId());
-						f.setMessageId(profile.getYearAutoMsgId());
-						Utils.send(f);
-					}
-
 					return new SendMessage().setChatId(chatId)
-					                        .setText("Ваша заявка принята. С Вами свяжутся");
+					                        .setText("Тип двигателя? (бензин / дизель)");
+
+				case WaitInviteEngineType:
+					profile = Database.em().findById(Profile.class, user.getId());
+					if (profile == null)
+					{
+						profile = new Profile();
+						profile.setId(user.getId());
+					}
+					if (!msg.hasText())
+					{
+						Utils.send(Utils.error("Нет текста", update));
+						user.setState(None);
+						user.persist();
+						return makeMainMenu(user, new SendMessage().setChatId(chatId));
+					}
+					user.setState(None);
+					user.persist();
+
+					profile.setEngineType(text);
+					profile.setEngineTypeMsgId(msg.getMessageId());
+					profile.persist();
+
+					return sendInvite(chatId, user, profile);
 
 				default:
 					return makeMainMenu(user, new SendMessage().setChatId(chatId));
@@ -383,6 +383,47 @@ public class BotCore extends TelegramWebhookBot
 
 			return makeMainMenu(user, new SendMessage().setChatId(chatId));
 		}
+	}
+
+	private BotApiMethod sendInvite(Long chatId, User user, Profile profile)
+	{
+		for (long admin : ADMINS)
+		{
+			Utils.send(new SendMessage()
+					           .setChatId(admin)
+					           .setText("Новая заявка от " + profile.getName()
+					                    + " из " + profile.getCity()
+					                    + " авто год: " + profile.getYearAuto()
+					                    + " (" + profile.getEngineType() + ")"
+					           ));
+
+			ForwardMessage f = new ForwardMessage();
+			f.setChatId(admin);
+			f.setFromChatId(user.getPersonalChatId());
+			f.setMessageId(profile.getNameMsgId());
+			Utils.send(f);
+
+			f = new ForwardMessage();
+			f.setChatId(admin);
+			f.setFromChatId(user.getPersonalChatId());
+			f.setMessageId(profile.getCityMsgId());
+			Utils.send(f);
+
+			f = new ForwardMessage();
+			f.setChatId(admin);
+			f.setFromChatId(user.getPersonalChatId());
+			f.setMessageId(profile.getYearAutoMsgId());
+			Utils.send(f);
+
+			f = new ForwardMessage();
+			f.setChatId(admin);
+			f.setFromChatId(user.getPersonalChatId());
+			f.setMessageId(profile.getEngineTypeMsgId());
+			Utils.send(f);
+		}
+
+		return new SendMessage().setChatId(chatId)
+		                        .setText("Ваша заявка принята. С Вами свяжутся");
 	}
 
 	private void checkMembership(User user)
