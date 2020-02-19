@@ -24,10 +24,11 @@ public class Database
 
 	public static void start()
 	{
-		_em.addEntityClass(User.class);
-		_em.addEntityClass(MarketPost.class);
-		_em.addEntityClass(RawLog.class);
-		_em.addEntityClass(Profile.class);
+		_em.findEntities("tlc200bot.model");
+//		_em.addEntityClass(User.class);
+//		_em.addEntityClass(MarketPost.class);
+//		_em.addEntityClass(RawLog.class);
+//		_em.addEntityClass(Profile.class);
 
 		_em.setConnectionFactory(Database::getConnection);
 
