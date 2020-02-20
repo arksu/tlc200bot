@@ -16,7 +16,7 @@ public class Launcher
 	public static void main(String[] args)
 	{
 		System.out.println("starting...");
-		ServerConfig.loadConfig();
+		ServerConfig.load();
 		Database.start();
 
 		ApiContextInitializer.init();

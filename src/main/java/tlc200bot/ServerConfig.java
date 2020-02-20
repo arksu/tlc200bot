@@ -18,7 +18,7 @@ public class ServerConfig
 	public static String TOKEN;
 	public static String PATH;
 
-	public static void loadConfig()
+	public static void load()
 	{
 		File configFile = new File(WORK_DIR + "config/server.conf");
 
