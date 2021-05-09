@@ -23,7 +23,7 @@ public enum UserState
 
 	public final int id;
 
-	private static final Map<Integer, UserState> lookup = new HashMap<Integer, UserState>();
+	private static final Map<Integer, UserState> lookup = new HashMap<>();
 
 	static
 	{
